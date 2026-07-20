@@ -1,10 +1,21 @@
 # Restless Hub (PWA)
 
 Cara pasang di GitHub Pages:
-1. Buat repo baru (atau folder di repo existing), lalu upload semua isi folder ini
-   (index.html, manifest.json, sw.js, icons/) ke root repo tersebut.
+1. Buat repo baru (atau folder di repo existing), lalu upload **SEMUA isi folder ini APA ADANYA**
+   ke root repo tersebut — index.html, manifest.json, sw.js, dan ketiga file icon-*.png
+   (semuanya sudah rata di satu level, tidak ada subfolder lagi, supaya tidak ke-flatten
+   saat upload lewat GitHub web).
 2. Aktifkan GitHub Pages: Settings > Pages > Deploy from branch > pilih branch & folder root.
 3. Buka URL Pages-nya di HP > menu browser > "Add to Home Screen" / "Install app".
+
+Kalau tombol install tidak muncul di Android:
+- Pastikan ketiga file icon (`icon-192.png`, `icon-512.png`, `icon-maskable-512.png`) benar-benar
+  ada di root repo (cek langsung: buka `https://<url-pages>/icon-192.png`, harus tampil gambar,
+  bukan 404).
+- Clear data situs itu di Chrome dulu (biar service worker lama yang sempat cache error tidak
+  kepakai), baru buka ulang.
+- Tunggu beberapa detik setelah halaman kebuka sebelum cek menu titik tiga — Chrome butuh waktu
+  untuk selesai evaluasi manifest.
 
 Catatan:
 - PWA (install + offline shell) hanya jalan di atas HTTPS — GitHub Pages sudah HTTPS otomatis.
