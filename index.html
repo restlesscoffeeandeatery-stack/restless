@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
 <title>Restless Hub</title>
+<meta name="theme-color" content="#241812">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Restless Hub">
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="./icons/icon-192.png">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -270,19 +278,105 @@
   .modal .row .cancel{background:transparent; color:var(--ink); border:1px solid rgba(26,18,11,0.2) !important;}
   .modal .row .save{background:var(--amber); color:var(--ink);}
   .modal .row .save:hover{background:var(--amber-2);}
+
+  /* ---- Lock screen ---- */
+  .lock-screen{
+    position:fixed; inset:0;
+    background:var(--espresso);
+    z-index:100;
+    display:flex; align-items:center; justify-content:center;
+    padding:24px;
+  }
+  .lock-screen.hidden{display:none;}
+  .lock-box{
+    width:100%; max-width:320px;
+    text-align:center;
+  }
+  .lock-box .lock-icon{font-size:30px; margin-bottom:14px;}
+  .lock-box h2{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:20px; margin:0 0 6px;
+  }
+  .lock-box p.lock-sub{
+    font-size:13px; color:var(--cream-2); opacity:.6; margin:0 0 26px;
+  }
+  .pin-dots{
+    display:flex; justify-content:center; gap:14px; margin-bottom:22px;
+  }
+  .pin-dots .dot{
+    width:16px; height:16px; border-radius:50%;
+    border:2px solid rgba(243,233,216,0.35);
+    background:transparent;
+    transition:background .12s ease, border-color .12s ease;
+  }
+  .pin-dots .dot.filled{background:var(--amber); border-color:var(--amber);}
+  .pin-dots.shake{animation:shake .35s;}
+  @keyframes shake{
+    10%,90%{transform:translateX(-2px);}
+    20%,80%{transform:translateX(4px);}
+    30%,50%,70%{transform:translateX(-8px);}
+    40%,60%{transform:translateX(8px);}
+  }
+  .lock-msg{
+    font-family:'JetBrains Mono',monospace;
+    font-size:12px; color:var(--rust);
+    min-height:16px; margin-bottom:10px;
+  }
+  .lock-msg.info{color:var(--sage);}
+  .lock-step-label{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px; letter-spacing:.1em; text-transform:uppercase;
+    color:var(--amber-2); margin-bottom:16px;
+  }
+  .lock-reset{
+    margin-top:28px; background:none; border:none;
+    color:var(--cream-2); opacity:.45; font-size:12px;
+    text-decoration:underline; cursor:pointer;
+  }
+  .lock-reset:hover{opacity:.8;}
+  .lock-btn-header{
+    background:none; border:1px solid rgba(243,233,216,0.25);
+    color:var(--cream); border-radius:8px;
+    width:34px; height:34px; font-size:14px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .empty-hint{
+    grid-column:1/-1;
+    font-size:13px; color:var(--cream-2); opacity:.55;
+    padding:18px 0 4px;
+  }
 </style>
 </head>
 <body>
 
-<header class="hub-header">
-  <p class="eyebrow">Restless &middot; Panel Program</p>
-  <h1>Restless Hub</h1>
-  <p class="sub">Semua program dibuka langsung di sini, tanpa pindah tab.</p>
+<header class="hub-header" style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px;">
+  <div>
+    <p class="eyebrow">Restless &middot; Panel Program</p>
+    <h1>Restless Hub</h1>
+    <p class="sub">Semua program dibuka langsung di sini, tanpa pindah tab.</p>
+  </div>
+  <button class="lock-btn-header" id="lockNowBtn" title="Kunci sekarang">🔒</button>
 </header>
 
 <main>
   <div class="grid" id="grid"></div>
 </main>
+
+<!-- Layar PIN (setup / masuk) -->
+<div class="lock-screen" id="lockScreen">
+  <div class="lock-box">
+    <div class="lock-icon">🔒</div>
+    <div class="lock-step-label" id="lockStepLabel">Akses Restless Hub</div>
+    <h2 id="lockTitle">Masukkan PIN</h2>
+    <p class="lock-sub" id="lockSub">Link program disembunyikan sampai PIN benar dimasukkan.</p>
+    <div class="lock-msg" id="lockMsg"></div>
+    <div class="pin-dots" id="pinDots">
+      <span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+    </div>
+    <input class="pin-hidden-input" id="pinInput" type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off">
+    <button class="lock-reset" id="resetVaultBtn">Lupa PIN? Reset semua data hub</button>
+  </div>
+</div>
 
 <!-- Overlay miniapp -->
 <div class="overlay" id="overlay">
@@ -328,29 +422,189 @@
 
 <script>
 (function(){
-  const STORAGE_KEY = 'restless_hub_apps_v1';
+  const VAULT_KEY = 'restless_hub_vault_v1';
 
-  const defaults = [
-    {id:'hpp', name:'HPP Manager', url:'[REDACTED_HPP_URL]', icon:'🧮', needsProduk:true, apiKey:''},
-    {id:'receiving', name:'Restless Receiving', url:'[REDACTED_URL]', icon:'📦', needsProduk:false, apiKey:''},
-    {id:'rekap', name:'Rekap Keuangan', url:'[REDACTED_URL]', icon:'📊', needsProduk:false, apiKey:''},
-    {id:'stock', name:'Restless Stock', url:'[REDACTED_URL]', icon:'🧺', needsProduk:false, apiKey:''}
-  ];
+  // ---------- Crypto helpers (AES-GCM, key derived from PIN via PBKDF2) ----------
+  function bufToB64(buf){
+    return btoa(String.fromCharCode(...new Uint8Array(buf)));
+  }
+  function b64ToBuf(b64){
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for(let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+    return bytes.buffer;
+  }
+  async function deriveKey(pin, saltB64){
+    const salt = new Uint8Array(b64ToBuf(saltB64));
+    const enc = new TextEncoder();
+    const baseKey = await crypto.subtle.importKey('raw', enc.encode(pin), 'PBKDF2', false, ['deriveKey']);
+    return crypto.subtle.deriveKey(
+      {name:'PBKDF2', salt, iterations:150000, hash:'SHA-256'},
+      baseKey,
+      {name:'AES-GCM', length:256},
+      false,
+      ['encrypt','decrypt']
+    );
+  }
+  async function encryptData(key, obj){
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const encoded = new TextEncoder().encode(JSON.stringify(obj));
+    const cipher = await crypto.subtle.encrypt({name:'AES-GCM', iv}, key, encoded);
+    return {iv: bufToB64(iv), data: bufToB64(cipher)};
+  }
+  async function decryptData(key, ivB64, dataB64){
+    const iv = new Uint8Array(b64ToBuf(ivB64));
+    const plainBuf = await crypto.subtle.decrypt({name:'AES-GCM', iv}, key, b64ToBuf(dataB64));
+    return JSON.parse(new TextDecoder().decode(plainBuf));
+  }
 
-  function loadApps(){
+  function readVault(){
     try{
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if(raw) return JSON.parse(raw);
-    }catch(e){}
-    saveApps(defaults);
-    return defaults.slice();
+      const raw = localStorage.getItem(VAULT_KEY);
+      return raw ? JSON.parse(raw) : null;
+    }catch(e){ return null; }
   }
-  function saveApps(apps){
-    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(apps)); }catch(e){}
+  function writeVault(vault){
+    localStorage.setItem(VAULT_KEY, JSON.stringify(vault));
   }
 
-  let apps = loadApps();
+  // Links only ever exist in memory (post-PIN) or as ciphertext in localStorage.
+  // Nothing plaintext is shipped in this file or left un-encrypted at rest.
+  let apps = [];
+  let sessionKey = null;
   let editingId = null;
+
+  // ---------- Lock screen ----------
+  const lockScreen = document.getElementById('lockScreen');
+  const lockTitle = document.getElementById('lockTitle');
+  const lockSub = document.getElementById('lockSub');
+  const lockStepLabel = document.getElementById('lockStepLabel');
+  const lockMsg = document.getElementById('lockMsg');
+  const pinDots = document.getElementById('pinDots');
+  const pinInput = document.getElementById('pinInput');
+  const resetVaultBtn = document.getElementById('resetVaultBtn');
+  const lockNowBtn = document.getElementById('lockNowBtn');
+
+  let setupStage = 'first'; // 'first' | 'confirm'
+  let tempPin = '';
+
+  function setDots(count){
+    pinDots.querySelectorAll('.dot').forEach((d,i) => d.classList.toggle('filled', i < count));
+  }
+  function shakeDots(msg){
+    lockMsg.textContent = msg;
+    lockMsg.classList.remove('info');
+    pinDots.classList.add('shake');
+    setTimeout(() => pinDots.classList.remove('shake'), 350);
+  }
+  function focusPin(){
+    pinInput.value = '';
+    setDots(0);
+    setTimeout(() => pinInput.focus(), 30);
+  }
+  function showLock(){
+    const vault = readVault();
+    lockNowBtn.style.display = vault ? 'flex' : 'none';
+    if(vault){
+      setupStage = 'unlock';
+      lockStepLabel.textContent = 'Akses Restless Hub';
+      lockTitle.textContent = 'Masukkan PIN';
+      lockSub.textContent = 'Link program disembunyikan sampai PIN benar dimasukkan.';
+    } else {
+      setupStage = 'first';
+      tempPin = '';
+      lockStepLabel.textContent = 'Setup Pertama Kali';
+      lockTitle.textContent = 'Buat PIN Akses';
+      lockSub.textContent = '4 digit, dipakai untuk mengunci semua link program di hub ini.';
+    }
+    lockMsg.textContent = '';
+    lockScreen.classList.remove('hidden');
+    focusPin();
+  }
+  function hideLock(){
+    lockScreen.classList.add('hidden');
+  }
+
+  async function handlePinComplete(pin){
+    if(setupStage === 'unlock'){
+      const vault = readVault();
+      try{
+        const key = await deriveKey(pin, vault.salt);
+        apps = await decryptData(key, vault.iv, vault.data);
+        sessionKey = key;
+        hideLock();
+        render();
+      }catch(e){
+        shakeDots('PIN salah, coba lagi.');
+        focusPin();
+      }
+      return;
+    }
+    if(setupStage === 'first'){
+      tempPin = pin;
+      setupStage = 'confirm';
+      lockTitle.textContent = 'Ulangi PIN';
+      lockSub.textContent = 'Masukkan sekali lagi untuk konfirmasi.';
+      lockMsg.textContent = '';
+      focusPin();
+      return;
+    }
+    if(setupStage === 'confirm'){
+      if(pin !== tempPin){
+        shakeDots('PIN tidak sama, ulangi dari awal.');
+        setupStage = 'first';
+        tempPin = '';
+        setTimeout(() => {
+          lockTitle.textContent = 'Buat PIN Akses';
+          lockSub.textContent = '4 digit, dipakai untuk mengunci semua link program di hub ini.';
+          focusPin();
+        }, 700);
+        return;
+      }
+      const saltBytes = crypto.getRandomValues(new Uint8Array(16));
+      const saltB64 = bufToB64(saltBytes.buffer);
+      const key = await deriveKey(pin, saltB64);
+      apps = [];
+      const enc = await encryptData(key, apps);
+      writeVault({salt: saltB64, iv: enc.iv, data: enc.data});
+      sessionKey = key;
+      hideLock();
+      render();
+    }
+  }
+
+  pinInput.addEventListener('input', () => {
+    const digits = pinInput.value.replace(/\D/g,'').slice(0,4);
+    pinInput.value = digits;
+    setDots(digits.length);
+    if(digits.length === 4){
+      pinInput.blur();
+      handlePinComplete(digits);
+    }
+  });
+  lockScreen.addEventListener('click', () => pinInput.focus());
+  lockNowBtn.addEventListener('click', () => {
+    sessionKey = null;
+    apps = [];
+    showLock();
+  });
+  resetVaultBtn.addEventListener('click', () => {
+    if(confirm('Ini akan MENGHAPUS semua link tersimpan (tidak bisa dikembalikan) dan minta kamu buat PIN baru. Lanjutkan?')){
+      localStorage.removeItem(VAULT_KEY);
+      sessionKey = null;
+      apps = [];
+      showLock();
+    }
+  });
+
+  async function persistApps(){
+    if(!sessionKey) return;
+    const vault = readVault();
+    const enc = await encryptData(sessionKey, apps);
+    vault.iv = enc.iv;
+    vault.data = enc.data;
+    writeVault(vault);
+  }
 
   const grid = document.getElementById('grid');
   const overlay = document.getElementById('overlay');
@@ -395,12 +649,19 @@
         e.stopPropagation();
         if(confirm(`Hapus "${app.name}" dari hub?`)){
           apps = apps.filter(a => a.id !== app.id);
-          saveApps(apps);
+          persistApps();
           render();
         }
       });
       grid.appendChild(el);
     });
+
+    if(apps.length === 0){
+      const hint = document.createElement('div');
+      hint.className = 'empty-hint';
+      hint.textContent = 'Belum ada program tersimpan. Tambahkan lewat tombol "+ Tambah Link" di bawah.';
+      grid.appendChild(hint);
+    }
 
     const addTile = document.createElement('div');
     addTile.className = 'ticket add-tile';
@@ -504,12 +765,18 @@
         apiKey: fApiKey.value.trim()
       });
     }
-    saveApps(apps);
+    persistApps();
     closeModal();
     render();
   });
 
-  render();
+  showLock();
+
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    });
+  }
 })();
 </script>
 </body>
