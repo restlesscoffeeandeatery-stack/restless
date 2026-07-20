@@ -362,19 +362,19 @@
   <div class="grid" id="grid"></div>
 </main>
 
-<!-- Layar PIN (setup / masuk) -->
+<!-- Layar PIN -->
 <div class="lock-screen" id="lockScreen">
   <div class="lock-box">
     <div class="lock-icon">🔒</div>
-    <div class="lock-step-label" id="lockStepLabel">Akses Restless Hub</div>
+    <div class="lock-step-label">Akses Restless Hub</div>
     <h2 id="lockTitle">Masukkan PIN</h2>
-    <p class="lock-sub" id="lockSub">Link program disembunyikan sampai PIN benar dimasukkan.</p>
+    <p class="lock-sub">Link program disembunyikan sampai PIN benar dimasukkan.</p>
     <div class="lock-msg" id="lockMsg"></div>
     <div class="pin-dots" id="pinDots">
       <span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span>
     </div>
     <input class="pin-hidden-input" id="pinInput" type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off">
-    <button class="lock-reset" id="resetVaultBtn">Lupa PIN? Reset semua data hub</button>
+    <p class="lock-sub" style="margin-top:22px; opacity:.4; font-size:11px;">PIN dikelola langsung oleh admin. Hubungi admin kalau lupa PIN.</p>
   </div>
 </div>
 
@@ -422,71 +422,20 @@
 
 <script>
 (function(){
-  const VAULT_KEY = 'restless_hub_vault_v1';
+  // ==== ISI DENGAN URL WEB APP APPS SCRIPT KAMU (diakhiri /exec) ====
+  const API_URL = 'PASTE_GAS_EXEC_URL_DI_SINI';
 
-  // ---------- Crypto helpers (AES-GCM, key derived from PIN via PBKDF2) ----------
-  function bufToB64(buf){
-    return btoa(String.fromCharCode(...new Uint8Array(buf)));
-  }
-  function b64ToBuf(b64){
-    const bin = atob(b64);
-    const bytes = new Uint8Array(bin.length);
-    for(let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
-    return bytes.buffer;
-  }
-  async function deriveKey(pin, saltB64){
-    const salt = new Uint8Array(b64ToBuf(saltB64));
-    const enc = new TextEncoder();
-    const baseKey = await crypto.subtle.importKey('raw', enc.encode(pin), 'PBKDF2', false, ['deriveKey']);
-    return crypto.subtle.deriveKey(
-      {name:'PBKDF2', salt, iterations:150000, hash:'SHA-256'},
-      baseKey,
-      {name:'AES-GCM', length:256},
-      false,
-      ['encrypt','decrypt']
-    );
-  }
-  async function encryptData(key, obj){
-    const iv = crypto.getRandomValues(new Uint8Array(12));
-    const encoded = new TextEncoder().encode(JSON.stringify(obj));
-    const cipher = await crypto.subtle.encrypt({name:'AES-GCM', iv}, key, encoded);
-    return {iv: bufToB64(iv), data: bufToB64(cipher)};
-  }
-  async function decryptData(key, ivB64, dataB64){
-    const iv = new Uint8Array(b64ToBuf(ivB64));
-    const plainBuf = await crypto.subtle.decrypt({name:'AES-GCM', iv}, key, b64ToBuf(dataB64));
-    return JSON.parse(new TextDecoder().decode(plainBuf));
-  }
-
-  function readVault(){
-    try{
-      const raw = localStorage.getItem(VAULT_KEY);
-      return raw ? JSON.parse(raw) : null;
-    }catch(e){ return null; }
-  }
-  function writeVault(vault){
-    localStorage.setItem(VAULT_KEY, JSON.stringify(vault));
-  }
-
-  // Links only ever exist in memory (post-PIN) or as ciphertext in localStorage.
-  // Nothing plaintext is shipped in this file or left un-encrypted at rest.
   let apps = [];
-  let sessionKey = null;
+  let currentPin = null; // disimpan di memori selama sesi, dipakai ulang saat save
   let editingId = null;
 
   // ---------- Lock screen ----------
   const lockScreen = document.getElementById('lockScreen');
   const lockTitle = document.getElementById('lockTitle');
-  const lockSub = document.getElementById('lockSub');
-  const lockStepLabel = document.getElementById('lockStepLabel');
   const lockMsg = document.getElementById('lockMsg');
   const pinDots = document.getElementById('pinDots');
   const pinInput = document.getElementById('pinInput');
-  const resetVaultBtn = document.getElementById('resetVaultBtn');
   const lockNowBtn = document.getElementById('lockNowBtn');
-
-  let setupStage = 'first'; // 'first' | 'confirm'
-  let tempPin = '';
 
   function setDots(count){
     pinDots.querySelectorAll('.dot').forEach((d,i) => d.classList.toggle('filled', i < count));
@@ -503,20 +452,7 @@
     setTimeout(() => pinInput.focus(), 30);
   }
   function showLock(){
-    const vault = readVault();
-    lockNowBtn.style.display = vault ? 'flex' : 'none';
-    if(vault){
-      setupStage = 'unlock';
-      lockStepLabel.textContent = 'Akses Restless Hub';
-      lockTitle.textContent = 'Masukkan PIN';
-      lockSub.textContent = 'Link program disembunyikan sampai PIN benar dimasukkan.';
-    } else {
-      setupStage = 'first';
-      tempPin = '';
-      lockStepLabel.textContent = 'Setup Pertama Kali';
-      lockTitle.textContent = 'Buat PIN Akses';
-      lockSub.textContent = '4 digit, dipakai untuk mengunci semua link program di hub ini.';
-    }
+    lockTitle.textContent = 'Masukkan PIN';
     lockMsg.textContent = '';
     lockScreen.classList.remove('hidden');
     focusPin();
@@ -525,51 +461,30 @@
     lockScreen.classList.add('hidden');
   }
 
+  async function callApi(params){
+    const url = API_URL + '?' + new URLSearchParams(params).toString();
+    const res = await fetch(url);
+    if(!res.ok) throw new Error('network');
+    return res.json();
+  }
+
   async function handlePinComplete(pin){
-    if(setupStage === 'unlock'){
-      const vault = readVault();
-      try{
-        const key = await deriveKey(pin, vault.salt);
-        apps = await decryptData(key, vault.iv, vault.data);
-        sessionKey = key;
+    lockMsg.classList.add('info');
+    lockMsg.textContent = 'Menghubungi server...';
+    try{
+      const result = await callApi({action:'unlock', pin});
+      if(result.ok){
+        apps = result.apps || [];
+        currentPin = pin;
         hideLock();
         render();
-      }catch(e){
+      } else {
         shakeDots('PIN salah, coba lagi.');
         focusPin();
       }
-      return;
-    }
-    if(setupStage === 'first'){
-      tempPin = pin;
-      setupStage = 'confirm';
-      lockTitle.textContent = 'Ulangi PIN';
-      lockSub.textContent = 'Masukkan sekali lagi untuk konfirmasi.';
-      lockMsg.textContent = '';
+    }catch(e){
+      shakeDots('Gagal menghubungi server. Cek koneksi internet.');
       focusPin();
-      return;
-    }
-    if(setupStage === 'confirm'){
-      if(pin !== tempPin){
-        shakeDots('PIN tidak sama, ulangi dari awal.');
-        setupStage = 'first';
-        tempPin = '';
-        setTimeout(() => {
-          lockTitle.textContent = 'Buat PIN Akses';
-          lockSub.textContent = '4 digit, dipakai untuk mengunci semua link program di hub ini.';
-          focusPin();
-        }, 700);
-        return;
-      }
-      const saltBytes = crypto.getRandomValues(new Uint8Array(16));
-      const saltB64 = bufToB64(saltBytes.buffer);
-      const key = await deriveKey(pin, saltB64);
-      apps = [];
-      const enc = await encryptData(key, apps);
-      writeVault({salt: saltB64, iv: enc.iv, data: enc.data});
-      sessionKey = key;
-      hideLock();
-      render();
     }
   }
 
@@ -584,26 +499,18 @@
   });
   lockScreen.addEventListener('click', () => pinInput.focus());
   lockNowBtn.addEventListener('click', () => {
-    sessionKey = null;
+    currentPin = null;
     apps = [];
     showLock();
   });
-  resetVaultBtn.addEventListener('click', () => {
-    if(confirm('Ini akan MENGHAPUS semua link tersimpan (tidak bisa dikembalikan) dan minta kamu buat PIN baru. Lanjutkan?')){
-      localStorage.removeItem(VAULT_KEY);
-      sessionKey = null;
-      apps = [];
-      showLock();
-    }
-  });
 
   async function persistApps(){
-    if(!sessionKey) return;
-    const vault = readVault();
-    const enc = await encryptData(sessionKey, apps);
-    vault.iv = enc.iv;
-    vault.data = enc.data;
-    writeVault(vault);
+    if(!currentPin) return;
+    try{
+      await callApi({action:'save', pin: currentPin, apps: JSON.stringify(apps)});
+    }catch(e){
+      alert('Gagal menyimpan ke server. Cek koneksi internet lalu coba lagi.');
+    }
   }
 
   const grid = document.getElementById('grid');
