@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>Restless Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --espresso:#241812;
+    --espresso-2:#2f2118;
+    --cream:#F3E9D8;
+    --cream-2:#EADFC9;
+    --amber:#C97A3D;
+    --amber-2:#E0995C;
+    --ink:#1A120B;
+    --rust:#8B3A2B;
+    --sage:#6E7F5C;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;height:100%;}
+  body{
+    background:
+      radial-gradient(circle at 15% 0%, rgba(201,122,61,0.10), transparent 45%),
+      radial-gradient(circle at 90% 10%, rgba(110,127,92,0.08), transparent 40%),
+      var(--espresso);
+    color:var(--cream);
+    font-family:'Inter',sans-serif;
+    min-height:100%;
+  }
+  header.hub-header{
+    padding:36px 20px 18px;
+    text-align:left;
+    max-width:920px;
+    margin:0 auto;
+  }
+  .eyebrow{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    letter-spacing:.18em;
+    text-transform:uppercase;
+    color:var(--amber-2);
+    margin:0 0 8px;
+  }
+  h1{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:clamp(28px,5vw,42px);
+    margin:0 0 6px;
+    letter-spacing:-0.01em;
+  }
+  header.hub-header p.sub{
+    margin:0;
+    color:var(--cream-2);
+    opacity:.65;
+    font-size:14px;
+  }
+
+  main{
+    max-width:920px;
+    margin:0 auto;
+    padding:8px 20px 80px;
+  }
+
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(160px,1fr));
+    gap:18px;
+    margin-top:22px;
+  }
+
+  .ticket{
+    position:relative;
+    background:var(--cream);
+    color:var(--ink);
+    border-radius:14px 14px 6px 6px;
+    padding:16px 14px 14px;
+    cursor:pointer;
+    transition:transform .18s ease, box-shadow .18s ease;
+    box-shadow:0 2px 0 rgba(0,0,0,0.15), 0 10px 24px -14px rgba(0,0,0,.5);
+    min-height:128px;
+    display:flex;
+    flex-direction:column;
+    justify-content:space-between;
+  }
+  .ticket:hover{transform:translateY(-3px);}
+  .ticket:active{transform:translateY(0px) scale(.98);}
+
+  /* perforation line + punch notches, evoking a torn receipt stub */
+  .ticket::before{
+    content:"";
+    position:absolute;
+    left:10px;right:10px;
+    bottom:40px;
+    border-top:2px dashed rgba(26,18,11,0.25);
+  }
+  .ticket::after{
+    content:"";
+    position:absolute;
+    left:-7px; right:-7px;
+    bottom:33px;
+    height:14px;
+    background:
+      radial-gradient(circle at 0 7px, var(--espresso) 7px, transparent 7.5px),
+      radial-gradient(circle at 100% 7px, var(--espresso) 7px, transparent 7.5px);
+    pointer-events:none;
+  }
+
+  .ticket .icon{font-size:26px; line-height:1;}
+  .ticket .name{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:700;
+    font-size:15px;
+    margin-top:8px;
+    line-height:1.15;
+  }
+  .ticket .url{
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px;
+    opacity:.55;
+    margin-top:16px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .ticket .actions{
+    position:absolute;
+    top:8px; right:8px;
+    display:flex;
+    gap:4px;
+    opacity:0;
+    transition:opacity .15s ease;
+  }
+  .ticket:hover .actions{opacity:1;}
+  .ticket .actions button{
+    width:22px;height:22px;
+    border:none;
+    border-radius:50%;
+    background:rgba(26,18,11,0.08);
+    color:var(--ink);
+    font-size:11px;
+    cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .ticket .actions button:hover{background:rgba(26,18,11,0.18);}
+  .ticket .actions button.del:hover{background:var(--rust); color:var(--cream);}
+
+  .ticket.add-tile{
+    background:transparent;
+    border:2px dashed rgba(243,233,216,0.3);
+    color:var(--cream);
+    align-items:center;
+    justify-content:center;
+    box-shadow:none;
+  }
+  .ticket.add-tile::before,.ticket.add-tile::after{display:none;}
+  .ticket.add-tile:hover{border-color:var(--amber-2); background:rgba(201,122,61,0.08);}
+  .ticket.add-tile .plus{font-size:30px; font-family:'Space Grotesk',sans-serif;}
+  .ticket.add-tile .name{margin-top:6px; font-size:13px; opacity:.8;}
+
+  /* ---- Overlay (miniapp) ---- */
+  .overlay{
+    position:fixed; inset:0;
+    background:var(--espresso);
+    display:flex; flex-direction:column;
+    transform:translateY(100%);
+    transition:transform .28s cubic-bezier(.32,.72,0,1);
+    z-index:50;
+  }
+  .overlay.open{transform:translateY(0);}
+  .overlay-bar{
+    display:flex; align-items:center; gap:10px;
+    padding:14px 16px;
+    background:var(--espresso-2);
+    border-bottom:1px solid rgba(243,233,216,0.08);
+  }
+  .overlay-bar button.back{
+    background:none;border:none;color:var(--cream);font-size:20px;cursor:pointer;
+    width:32px;height:32px;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .overlay-bar .title{
+    font-family:'Space Grotesk',sans-serif;
+    font-weight:700; font-size:15px; flex:1;
+  }
+  .overlay-bar a.ext{
+    font-family:'JetBrains Mono',monospace;
+    font-size:11px;
+    color:var(--amber-2);
+    text-decoration:none;
+    border:1px solid rgba(201,122,61,0.4);
+    padding:5px 9px;
+    border-radius:8px;
+    white-space:nowrap;
+  }
+  .overlay iframe{
+    flex:1; width:100%; border:none; background:var(--cream);
+  }
+  .produk-form{
+    padding:40px 24px;
+    max-width:360px;
+    margin:0 auto;
+    text-align:center;
+  }
+  .produk-form p{font-size:13px; opacity:.7; margin-bottom:18px;}
+  .produk-form input{
+    width:100%;
+    padding:12px 14px;
+    border-radius:10px;
+    border:1px solid rgba(243,233,216,0.2);
+    background:var(--espresso-2);
+    color:var(--cream);
+    font-family:'Inter',sans-serif;
+    font-size:14px;
+    margin-bottom:10px;
+  }
+  .produk-form button{
+    width:100%;
+    padding:12px;
+    border-radius:10px;
+    border:none;
+    background:var(--amber);
+    color:var(--ink);
+    font-weight:600;
+    font-size:14px;
+    cursor:pointer;
+  }
+
+  /* ---- Modal (add/edit) ---- */
+  .modal-bg{
+    position:fixed; inset:0;
+    background:rgba(15,10,6,0.6);
+    display:none;
+    align-items:center; justify-content:center;
+    z-index:60;
+    padding:20px;
+  }
+  .modal-bg.open{display:flex;}
+  .modal{
+    background:var(--cream);
+    color:var(--ink);
+    width:100%; max-width:380px;
+    border-radius:16px;
+    padding:22px;
+  }
+  .modal h3{
+    font-family:'Space Grotesk',sans-serif;
+    margin:0 0 4px; font-size:18px;
+  }
+  .modal p.hint{font-size:12px; opacity:.6; margin:0 0 16px;}
+  .field{margin-bottom:12px;}
+  .field label{
+    display:block; font-size:11px; font-family:'JetBrains Mono',monospace;
+    text-transform:uppercase; letter-spacing:.06em; opacity:.6; margin-bottom:5px;
+  }
+  .field input{
+    width:100%; padding:10px 12px;
+    border:1px solid rgba(26,18,11,0.15);
+    border-radius:8px; font-size:14px; font-family:'Inter',sans-serif;
+    background:#fff;
+  }
+  .field.checkbox{display:flex; align-items:center; gap:8px;}
+  .field.checkbox input{width:auto;}
+  .field.checkbox label{margin:0;}
+  .modal .row{display:flex; gap:10px; margin-top:18px;}
+  .modal .row button{
+    flex:1; padding:11px; border-radius:9px; border:none;
+    font-weight:600; font-size:13px; cursor:pointer;
+  }
+  .modal .row .cancel{background:transparent; color:var(--ink); border:1px solid rgba(26,18,11,0.2) !important;}
+  .modal .row .save{background:var(--amber); color:var(--ink);}
+  .modal .row .save:hover{background:var(--amber-2);}
+</style>
+</head>
+<body>
+
+<header class="hub-header">
+  <p class="eyebrow">Restless &middot; Panel Program</p>
+  <h1>Restless Hub</h1>
+  <p class="sub">Semua program dibuka langsung di sini, tanpa pindah tab.</p>
+</header>
+
+<main>
+  <div class="grid" id="grid"></div>
+</main>
+
+<!-- Overlay miniapp -->
+<div class="overlay" id="overlay">
+  <div class="overlay-bar">
+    <button class="back" id="backBtn">&larr;</button>
+    <div class="title" id="overlayTitle">Program</div>
+    <a class="ext" id="extLink" href="#" target="_blank" rel="noopener">Buka tab baru</a>
+  </div>
+  <div id="overlayBody" style="flex:1; display:flex; flex-direction:column;"></div>
+</div>
+
+<!-- Modal tambah/edit -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <h3 id="modalTitle">Tambah Link</h3>
+    <p class="hint">Program akan tampil sebagai tiket baru di hub.</p>
+    <div class="field">
+      <label>Nama Program</label>
+      <input id="fName" type="text" placeholder="Misal: Cash Report">
+    </div>
+    <div class="field">
+      <label>URL</label>
+      <input id="fUrl" type="text" placeholder="https://...">
+    </div>
+    <div class="field">
+      <label>Ikon (emoji, opsional)</label>
+      <input id="fIcon" type="text" placeholder="🔗" maxlength="4">
+    </div>
+    <div class="field checkbox">
+      <input id="fNeedsProduk" type="checkbox">
+      <label for="fNeedsProduk">Endpoint butuh input nama produk (seperti HPP Manager)</label>
+    </div>
+    <div class="field" id="apiKeyField" style="display:none;">
+      <label>API Key (opsional, ikut dikirim sebagai ?key=)</label>
+      <input id="fApiKey" type="text" placeholder="BOT_API_KEY">
+    </div>
+    <div class="row">
+      <button class="cancel" id="cancelBtn">Batal</button>
+      <button class="save" id="saveBtn">Simpan</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const STORAGE_KEY = 'restless_hub_apps_v1';
+
+  const defaults = [
+    {id:'hpp', name:'HPP Manager', url:'[REDACTED_HPP_URL]', icon:'🧮', needsProduk:true, apiKey:''},
+    {id:'receiving', name:'Restless Receiving', url:'[REDACTED_URL]', icon:'📦', needsProduk:false, apiKey:''},
+    {id:'rekap', name:'Rekap Keuangan', url:'[REDACTED_URL]', icon:'📊', needsProduk:false, apiKey:''},
+    {id:'stock', name:'Restless Stock', url:'[REDACTED_URL]', icon:'🧺', needsProduk:false, apiKey:''}
+  ];
+
+  function loadApps(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(raw) return JSON.parse(raw);
+    }catch(e){}
+    saveApps(defaults);
+    return defaults.slice();
+  }
+  function saveApps(apps){
+    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(apps)); }catch(e){}
+  }
+
+  let apps = loadApps();
+  let editingId = null;
+
+  const grid = document.getElementById('grid');
+  const overlay = document.getElementById('overlay');
+  const overlayTitle = document.getElementById('overlayTitle');
+  const overlayBody = document.getElementById('overlayBody');
+  const extLink = document.getElementById('extLink');
+  const backBtn = document.getElementById('backBtn');
+  const modalBg = document.getElementById('modalBg');
+  const modalTitle = document.getElementById('modalTitle');
+  const fName = document.getElementById('fName');
+  const fUrl = document.getElementById('fUrl');
+  const fIcon = document.getElementById('fIcon');
+  const fNeedsProduk = document.getElementById('fNeedsProduk');
+  const fApiKey = document.getElementById('fApiKey');
+  const apiKeyField = document.getElementById('apiKeyField');
+  const saveBtn = document.getElementById('saveBtn');
+  const cancelBtn = document.getElementById('cancelBtn');
+
+  function render(){
+    grid.innerHTML = '';
+    apps.forEach(app => {
+      const el = document.createElement('div');
+      el.className = 'ticket';
+      el.innerHTML = `
+        <div class="actions">
+          <button class="edit" title="Edit">✎</button>
+          <button class="del" title="Hapus">✕</button>
+        </div>
+        <div class="icon">${app.icon || '🔗'}</div>
+        <div class="name">${escapeHtml(app.name)}</div>
+        <div class="url">${escapeHtml(app.url.replace(/^https?:\/\//,''))}</div>
+      `;
+      el.addEventListener('click', (e) => {
+        if(e.target.closest('.actions')) return;
+        openApp(app);
+      });
+      el.querySelector('.edit').addEventListener('click', (e)=>{
+        e.stopPropagation();
+        openModal(app);
+      });
+      el.querySelector('.del').addEventListener('click', (e)=>{
+        e.stopPropagation();
+        if(confirm(`Hapus "${app.name}" dari hub?`)){
+          apps = apps.filter(a => a.id !== app.id);
+          saveApps(apps);
+          render();
+        }
+      });
+      grid.appendChild(el);
+    });
+
+    const addTile = document.createElement('div');
+    addTile.className = 'ticket add-tile';
+    addTile.innerHTML = `<div class="plus">+</div><div class="name">Tambah Link</div>`;
+    addTile.addEventListener('click', () => openModal(null));
+    grid.appendChild(addTile);
+  }
+
+  function escapeHtml(s){
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function openApp(app){
+    overlayTitle.textContent = app.name;
+    extLink.href = app.url;
+    overlayBody.innerHTML = '';
+
+    if(app.needsProduk){
+      const wrap = document.createElement('div');
+      wrap.className = 'produk-form';
+      wrap.innerHTML = `
+        <p>${escapeHtml(app.name)} butuh nama produk untuk dibuka.</p>
+        <input type="text" id="produkInput" placeholder="Nama produk">
+        <button id="produkGo">Buka</button>
+      `;
+      overlayBody.appendChild(wrap);
+      wrap.querySelector('#produkGo').addEventListener('click', () => {
+        const val = wrap.querySelector('#produkInput').value.trim();
+        if(!val) return;
+        const sep = app.url.includes('?') ? '&' : '?';
+        let src = app.url + sep;
+        if(app.apiKey) src += `key=${encodeURIComponent(app.apiKey)}&`;
+        src += `produk=${encodeURIComponent(val)}`;
+        loadIframe(src, app.url);
+      });
+      wrap.querySelector('#produkInput').addEventListener('keydown', (e)=>{
+        if(e.key === 'Enter') wrap.querySelector('#produkGo').click();
+      });
+    } else {
+      loadIframe(app.url, app.url);
+    }
+
+    overlay.classList.add('open');
+  }
+
+  function loadIframe(src, extHref){
+    const iframe = document.createElement('iframe');
+    iframe.src = src;
+    overlayBody.innerHTML = '';
+    overlayBody.appendChild(iframe);
+    extLink.href = extHref;
+  }
+
+  backBtn.addEventListener('click', () => {
+    overlay.classList.remove('open');
+    setTimeout(() => { overlayBody.innerHTML = ''; }, 280);
+  });
+
+  function openModal(app){
+    editingId = app ? app.id : null;
+    modalTitle.textContent = app ? 'Edit Link' : 'Tambah Link';
+    fName.value = app ? app.name : '';
+    fUrl.value = app ? app.url : '';
+    fIcon.value = app ? (app.icon || '') : '';
+    fNeedsProduk.checked = app ? !!app.needsProduk : false;
+    fApiKey.value = app ? (app.apiKey || '') : '';
+    apiKeyField.style.display = fNeedsProduk.checked ? 'block' : 'none';
+    modalBg.classList.add('open');
+    setTimeout(()=>fName.focus(), 50);
+  }
+  function closeModal(){
+    modalBg.classList.remove('open');
+  }
+  fNeedsProduk.addEventListener('change', () => {
+    apiKeyField.style.display = fNeedsProduk.checked ? 'block' : 'none';
+  });
+  cancelBtn.addEventListener('click', closeModal);
+  modalBg.addEventListener('click', (e) => { if(e.target === modalBg) closeModal(); });
+
+  saveBtn.addEventListener('click', () => {
+    const name = fName.value.trim();
+    let url = fUrl.value.trim();
+    if(!name || !url){
+      alert('Nama dan URL wajib diisi.');
+      return;
+    }
+    if(!/^https?:\/\//i.test(url)) url = 'https://' + url;
+
+    if(editingId){
+      apps = apps.map(a => a.id === editingId ? {
+        ...a, name, url, icon: fIcon.value.trim(), needsProduk: fNeedsProduk.checked, apiKey: fApiKey.value.trim()
+      } : a);
+    } else {
+      apps.push({
+        id: 'c' + Date.now(),
+        name, url,
+        icon: fIcon.value.trim() || '🔗',
+        needsProduk: fNeedsProduk.checked,
+        apiKey: fApiKey.value.trim()
+      });
+    }
+    saveApps(apps);
+    closeModal();
+    render();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
