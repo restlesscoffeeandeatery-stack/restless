@@ -621,7 +621,7 @@
   // membuka beberapa aplikasi.
   function openInWindow(url, appId){
     const winName = 'restlesshub_' + appId;
-    const features = 'popup=yes,menubar=no,toolbar=no,location=no,status=no,width=1100,height=760';
+    const features = 'popup=yes,menubar=no,toolbar=no,location=no,status=no,width=412,height=890';
     const w = window.open(url, winName, features);
     if(w){
       try { w.opener = null; } catch(e){}
