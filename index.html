@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -620,7 +621,8 @@
   // membuka beberapa aplikasi.
   function openInWindow(url, appId){
     const winName = 'restlesshub_' + appId;
-    const w = window.open(url, winName);
+    const features = 'popup=yes,menubar=no,toolbar=no,location=no,status=no,width=1100,height=760';
+    const w = window.open(url, winName, features);
     if(w){
       try { w.opener = null; } catch(e){}
       w.focus();
