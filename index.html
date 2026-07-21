@@ -378,12 +378,11 @@
   </div>
 </div>
 
-<!-- Overlay miniapp -->
+<!-- Overlay: hanya dipakai untuk form input (misal nama produk HPP) sebelum buka jendela baru -->
 <div class="overlay" id="overlay">
   <div class="overlay-bar">
     <button class="back" id="backBtn">&larr;</button>
     <div class="title" id="overlayTitle">Program</div>
-    <a class="ext" id="extLink" href="#" target="_blank" rel="noopener">Buka tab baru</a>
   </div>
   <div id="overlayBody" style="flex:1; display:flex; flex-direction:column;"></div>
 </div>
@@ -423,7 +422,7 @@
 <script>
 (function(){
   // ==== ISI DENGAN URL WEB APP APPS SCRIPT KAMU (diakhiri /exec) ====
-  const API_URL = 'https://script.google.com/macros/s/AKfycbzGfBynhVQQH8nJQQQxYH5JRTDBAPmpTedJKILFKeQNHja12wihYeSem5EcKW8faCkm/exec';
+  const API_URL = 'PASTE_GAS_EXEC_URL_DI_SINI';
 
   let apps = [];
   let currentPin = null; // disimpan di memori selama sesi, dipakai ulang saat save
@@ -517,7 +516,6 @@
   const overlay = document.getElementById('overlay');
   const overlayTitle = document.getElementById('overlayTitle');
   const overlayBody = document.getElementById('overlayBody');
-  const extLink = document.getElementById('extLink');
   const backBtn = document.getElementById('backBtn');
   const modalBg = document.getElementById('modalBg');
   const modalTitle = document.getElementById('modalTitle');
@@ -584,44 +582,51 @@
   }
 
   function openApp(app){
-    overlayTitle.textContent = app.name;
-    extLink.href = app.url;
-    overlayBody.innerHTML = '';
-
     if(app.needsProduk){
+      overlayTitle.textContent = app.name;
+      overlayBody.innerHTML = '';
       const wrap = document.createElement('div');
       wrap.className = 'produk-form';
       wrap.innerHTML = `
         <p>${escapeHtml(app.name)} butuh nama produk untuk dibuka.</p>
         <input type="text" id="produkInput" placeholder="Nama produk">
-        <button id="produkGo">Buka</button>
+        <button id="produkGo">Buka di jendela baru</button>
       `;
       overlayBody.appendChild(wrap);
-      wrap.querySelector('#produkGo').addEventListener('click', () => {
+      const go = () => {
         const val = wrap.querySelector('#produkInput').value.trim();
         if(!val) return;
         const sep = app.url.includes('?') ? '&' : '?';
         let src = app.url + sep;
         if(app.apiKey) src += `key=${encodeURIComponent(app.apiKey)}&`;
         src += `produk=${encodeURIComponent(val)}`;
-        loadIframe(src, app.url);
-      });
+        openInWindow(src, app.id);
+        overlay.classList.remove('open');
+      };
+      wrap.querySelector('#produkGo').addEventListener('click', go);
       wrap.querySelector('#produkInput').addEventListener('keydown', (e)=>{
-        if(e.key === 'Enter') wrap.querySelector('#produkGo').click();
+        if(e.key === 'Enter') go();
       });
+      overlay.classList.add('open');
+      setTimeout(() => wrap.querySelector('#produkInput').focus(), 50);
     } else {
-      loadIframe(app.url, app.url);
+      openInWindow(app.url, app.id);
     }
-
-    overlay.classList.add('open');
   }
 
-  function loadIframe(src, extHref){
-    const iframe = document.createElement('iframe');
-    iframe.src = src;
-    overlayBody.innerHTML = '';
-    overlayBody.appendChild(iframe);
-    extLink.href = extHref;
+  // Buka tiap program di jendela/tab browser TERPISAH, satu per app.id.
+  // Klik program yang sama lagi -> fokus ke jendela yang sudah terbuka (bukan duplikat),
+  // sehingga beberapa program bisa terbuka bersamaan dan mudah ganti-ganti seperti
+  // membuka beberapa aplikasi.
+  function openInWindow(url, appId){
+    const winName = 'restlesshub_' + appId;
+    const w = window.open(url, winName);
+    if(w){
+      try { w.opener = null; } catch(e){}
+      w.focus();
+    } else {
+      alert('Browser memblokir pop-up. Izinkan pop-up untuk situs ini agar program bisa dibuka di jendela baru.');
+    }
   }
 
   backBtn.addEventListener('click', () => {
